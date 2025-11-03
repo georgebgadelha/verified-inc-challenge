@@ -1,0 +1,20 @@
+{
+    "name": "verifiedinc-chat-api",
+    "version": "0.1.0",
+    "description": "Minimal backend API for chat system",
+    "main": "dist/index.js",
+    "engines": {
+      "node": "22"
+    },
+    "scripts": {
+      "build": "tsc -p .",
+      "start": "node dist/index.js",
+      "start:dev": "ts-node src/index.ts",
+      "test": "echo \"No tests configured\" && exit 0"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "MIT",
+    "dependencies": {},
+    "devDependencies": {}
+  }
