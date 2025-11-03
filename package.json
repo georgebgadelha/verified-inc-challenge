@@ -12,7 +12,11 @@
     "dev": "ts-node-dev --respawn --transpile-only src/main.ts",
     "start:dev": "ts-node-dev --respawn --transpile-only src/main.ts",
     "lint": "eslint \"src/**/*.ts\" || true",
-    "test": "echo \"No tests configured\" && exit 0"
+    "test": "echo \"No tests configured\" && exit 0",
+    "docker:up": "docker compose up -d",
+    "docker:logs": "docker compose logs -f",
+    "docker:down": "docker compose down",
+    "docker:restart": "docker compose restart"
   },
   "keywords": [],
   "author": "",
