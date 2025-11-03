@@ -1,20 +1,34 @@
 {
-    "name": "verifiedinc-chat-api",
-    "version": "0.1.0",
-    "description": "Minimal backend API for chat system",
-    "main": "dist/index.js",
-    "engines": {
-      "node": "22"
-    },
-    "scripts": {
-      "build": "tsc -p .",
-      "start": "node dist/index.js",
-      "start:dev": "ts-node src/index.ts",
-      "test": "echo \"No tests configured\" && exit 0"
-    },
-    "keywords": [],
-    "author": "",
-    "license": "MIT",
-    "dependencies": {},
-    "devDependencies": {}
+  "name": "verifiedinc-chat-api",
+  "version": "0.1.0",
+  "description": "Minimal backend API for chat system (Nest scaffold)",
+  "main": "dist/main.js",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "build": "tsc -p .",
+    "start": "node dist/main.js",
+    "dev": "ts-node-dev --respawn --transpile-only src/main.ts",
+    "start:dev": "ts-node-dev --respawn --transpile-only src/main.ts",
+    "lint": "eslint \"src/**/*.ts\" || true",
+    "test": "echo \"No tests configured\" && exit 0"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@nestjs/common": "^10.0.0",
+    "@nestjs/core": "^10.0.0",
+    "@nestjs/platform-express": "^10.0.0",
+  "reflect-metadata": "^0.1.13"
+  },
+  "devDependencies": {
+    "ts-node-dev": "^2.0.0",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.7.4",
+    "@types/node": "^20.4.2",
+    "eslint": "^8.44.0"
   }
+
+}
