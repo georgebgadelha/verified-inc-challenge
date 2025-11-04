@@ -1,6 +1,6 @@
 /* eslint-disable no-console */
 // Simple logger exposing info/warn/debug/error methods.
-// Each method prints a timestamp and the supplied message using the corresponding console method.
+// Each method prints the type, a timestamp and the supplied message using the corresponding console method.
 
 const ts = () => new Date().toISOString();
 
