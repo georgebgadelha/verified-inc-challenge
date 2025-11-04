@@ -74,7 +74,10 @@ npm test                 # Run all unit tests
 
 Some stuff I'd add if this were production:
 
+- **Soft delete** - So we don't loose the message, better for auditing
+- ** Bulk operations ** - Like deleting multiple messages
 - **Tests with a dedicated test database** - Currently e2e tests hit the dev db
+- **Caching** - Redis for frequently accessed messages or user's status
 - **Auth** - No login/permissions yet
 - **WebSockets** - Real-time updates would be nice
 - **Field selection** - Let clients pick which fields they want back
