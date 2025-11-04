@@ -27,7 +27,6 @@ Stop with `npm run docker:down`.
 
 # Testing
 npm test                 # Run all unit tests
-```
 
 ## Optional features chosen to be implemented
 
@@ -75,7 +74,7 @@ npm test                 # Run all unit tests
 Some stuff I'd add if this were production:
 
 - **Soft delete** - So we don't loose the message, better for auditing
-- ** Bulk operations ** - Like deleting multiple messages
+- **Bulk operations** - Like deleting multiple messages
 - **Tests with a dedicated test database** - Currently e2e tests hit the dev db
 - **Caching** - Redis for frequently accessed messages or user's status
 - **Auth** - No login/permissions yet
@@ -97,4 +96,20 @@ Coverage includes:
 
 The e2e tests clean up after themselves.
 
-```
+## Design Decisions & Trade-offs
+
+**NestJS over Express** - Went with NestJS because it provides structure out of the box (dependency injection, modules, decorators). Trade-off: slightly more boilerplate, but scales better for team projects.
+
+**Prisma ORM** - Chose Prisma for type-safe database queries and easy migrations. The generated client catches errors at compile time. Trade-off: adds a build step, but worth it for the developer experience.
+
+**Hard delete vs Soft delete** - Currently using hard delete for simplicity. In production, I'd use soft delete (a `deleted` flag) for audit trails and data recovery.
+
+**Page-based pagination** - Implemented offset/limit pagination because it's intuitive and supports jumping to specific pages. Trade-off: slower with huge datasets (millions of records), but fine for most use cases.
+
+**PATCH over PUT** - Used PATCH for updates since only `content` is editable. PUT would require sending all fields. This prevents accidental overwrites.
+
+**Monolithic structure** - Everything in one service for now. For scale, I'd split into microservices (message service, user service, notification service). Trade-off: simpler deployment vs. harder to scale individual components.
+
+**Rate limiting globally** - Applied rate limiting at the app level (100 req/min). Should be more granular in production - tighter limits on POST, looser on GET.
+
+**Docker Compose for local dev** - Makes setup a one-liner (`npm run docker:up`). Trade-off: requires Docker installed, but eliminates "works on my machine" issues.
