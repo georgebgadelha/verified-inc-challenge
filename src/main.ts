@@ -21,10 +21,15 @@ async function bootstrap() {
   // Swagger API documentation
   const config = new DocumentBuilder()
     .setTitle('Chat API')
-    .setDescription('Backend API for chat system with message threading support')
+    .setDescription('Backend API for chat system with JWT authentication and message threading support')
     .setVersion('1.0')
+    .addTag('auth', 'Authentication endpoints (register, login, refresh)')
+    .addTag('users', 'User profile and account management')
+    .addTag('groups', 'Group creation and management')
+    .addTag('messages', 'Message CRUD and reply operations (requires authentication)')
     .addTag('health', 'Health check endpoints')
-    .addTag('messages', 'Message CRUD and reply operations')
+    .addBearerAuth()
+    .addApiKey({ type: 'apiKey', name: 'X-API-Key', in: 'header' }, 'X-API-Key')
     .build();
   
   const document = SwaggerModule.createDocument(app, config);

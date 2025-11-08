@@ -2,70 +2,51 @@ import { ApiProperty } from '@nestjs/swagger';
 import { MessageEntity } from '../entities/message.entity';
 
 /**
- * Metadata for paginated results.
+ * Cursor-based pagination metadata.
+ * Provides consistent results even when data is being added/removed in real-time.
  */
-export class PaginationMeta {
-  /** Current page number (1-based) */
+export class CursorPaginationMeta {
+  /** Number of items in the current response */
   @ApiProperty({
-    description: 'Current page number (1-based)',
-    example: 1,
-  })
-  currentPage: number;
-
-  /** Number of items per page */
-  @ApiProperty({
-    description: 'Number of items per page',
+    description: 'Number of items returned',
     example: 20,
   })
-  pageSize: number;
+  count: number;
 
-  /** Total number of items across all pages */
+  /** Number of items requested per page */
   @ApiProperty({
-    description: 'Total number of items',
-    example: 47,
+    description: 'Number of items requested per page',
+    example: 20,
   })
-  totalItems: number;
+  limit: number;
 
-  /** Total number of pages */
+  /** Cursor for the next page (null if no more results) */
   @ApiProperty({
-    description: 'Total number of pages',
-    example: 3,
+    description: 'Cursor to fetch the next page (use as cursor parameter in next request)',
+    example: '2023-11-07T12:34:56.789Z_abc123',
+    nullable: true,
   })
-  totalPages: number;
+  nextCursor: string | null;
 
-  /** Whether there is a next page */
+  /** Cursor for the previous page (null if this is the first page) */
   @ApiProperty({
-    description: 'Whether there is a next page',
+    description: 'Cursor to fetch the previous page (use as cursor parameter with reverse sort)',
+    example: '2023-11-07T12:00:00.000Z_xyz789',
+    nullable: true,
+  })
+  prevCursor: string | null;
+
+  /** Whether there are more results available */
+  @ApiProperty({
+    description: 'Whether there are more results after this page',
     example: true,
   })
-  hasNextPage: boolean;
-
-  /** Whether there is a previous page */
-  @ApiProperty({
-    description: 'Whether there is a previous page',
-    example: false,
-  })
-  hasPreviousPage: boolean;
-
-  /** Next page number (null if no next page) */
-  @ApiProperty({
-    description: 'Next page number (null if last page)',
-    example: 2,
-    nullable: true,
-  })
-  nextPage: number | null;
-
-  /** Previous page number (null if no previous page) */
-  @ApiProperty({
-    description: 'Previous page number (null if first page)',
-    example: null,
-    nullable: true,
-  })
-  previousPage: number | null;
+  hasMore: boolean;
 }
 
 /**
- * Paginated response for messages.
+ * Cursor-based paginated response for messages.
+ * Uses message timestamp + ID as cursor for consistent pagination.
  */
 export class PaginatedMessagesDto {
   /** Array of messages for the current page */
@@ -75,10 +56,10 @@ export class PaginatedMessagesDto {
   })
   data: MessageEntity[];
 
-  /** Pagination metadata */
+  /** Cursor pagination metadata */
   @ApiProperty({
-    description: 'Pagination metadata',
-    type: PaginationMeta,
+    description: 'Cursor pagination metadata',
+    type: CursorPaginationMeta,
   })
-  meta: PaginationMeta;
+  meta: CursorPaginationMeta;
 }

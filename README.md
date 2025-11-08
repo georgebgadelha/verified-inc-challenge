@@ -1,115 +1,225 @@
-# Chat API
+# Chat API Backend
 
-Backend for a simple chat system. Send messages, reply to them, edit, delete.
+A backend API for a chat system with user authentication, direct messaging, group chats, and message threading.
 
-## Stack
+## Tech Stack
 
-Pretty standard: Node.js 22, NestJS 11, TypeScript, PostgreSQL with Prisma, Swagger docs, Docker.
+- **Node.js 22** with **TypeScript** for type safety
+- **NestJS 11** as the framework (provides good structure out of the box)
+- **PostgreSQL** for the database
+- **Prisma ORM** for type-safe database queries and migrations
+- **JWT** for authentication (access + refresh tokens)
+- **Redis** for caching group membership checks
+- **Docker** for easy local setup
+- **Swagger** for API documentation
 
-## Quick Start
+## Getting Started
+
+Make sure you have Docker installed, then:
 
 ```bash
 npm run docker:up
 ```
 
-**That's it!** The containers will:
-1. Start PostgreSQL
-2. Create database schema automatically
-3. Seed with sample users (Alice & Bob)
+This command will:
+1. Start PostgreSQL and Redis containers
+2. Run database migrations automatically
+3. Seed the database with test users:
+   - **Alice**: alice@example.com / password123
+   - **Bob**: bob@example.com / password123
+   - **Charlie**: charlie@example.com / password123
 4. Start the API on http://localhost:3000
 
-**Test it:**
-That's it. Check health at `http://localhost:3000/v1/health` or browse the API at `http://localhost:3000/api` (Swagger UI). See [API.md](./API.md) for curl examples.
+That's it! The API is ready to use.
 
-Stop with `npm run docker:down`.
+### Quick Test
 
-## Implemented Features
+Check if everything's running:
+```bash
+curl http://localhost:3000/v1/health
+```
 
-# Testing
-npm test                 # Run all unit tests
+Or open http://localhost:3000/api in your browser to see the interactive Swagger documentation.
 
-## Optional features chosen to be implemented
+### Stopping
 
-- API versioning (v1)
-- Pagination with metadata
-- Ability to limit amount of messages returned from GET /messages and sort as well
-- Swagger/OpenAPI documentation
-- Rate limiting (100 req/min globally)
-- Request logging middleware (audit trail)
-- Enhanced health check (database, memory, uptime)
+```bash
+npm run docker:down
+```
 
-## Future Enhancements
+## What's Implemented
 
-### High Priority
+### Core Features
+- **User Authentication**: Register, login with JWT tokens (15-min access, 7-day refresh)
+- **User Management**: Get profile, delete account (soft delete)
+- **Direct Messages**: Send messages to other users
+- **Group Chats**: Create groups, add/remove members, assign admin roles
+- **Message Threading**: Reply to messages, view all replies
+- **Message Management**: Edit and delete your own messages
+- **Pagination**: Cursor-based pagination for consistent results even with new data
 
-- **Refine Rate Limiting** - Currently applied globally at 100 req/min. For a chat API, this should be more nuanced:
-  - Remove rate limits from GET endpoints (reading is harmless)
-  - Apply stricter limits to POST /messages (e.g., 60/min to prevent spam)
-  - Keep strict limits on authentication endpoints (when implemented)
-  - Consider implementing soft limits with degradation instead of hard blocks
+### Technical Features
+- **JWT Authentication**: Secure token-based auth with refresh token flow
+- **Role-Based Authorization**: Group admins vs members with different permissions
+- **Input Validation**: Strong validation on all inputs (email format, phone numbers, UUIDs, etc.)
+- **Error Handling**: Consistent error responses across the API
+- **Redis Caching**: Group membership validation cached (big reduction in DB queries)
+- **Rate Limiting**: 100 requests per minute to prevent abuse (this would be more granular making read endpoints more loosely and write operations with specific numbers of requests per endpoint)
+- **Request Logging**: All requests logged with timestamp, method, route, and response time
+- **Health Checks**: Endpoint to check API status, database connection, and memory usage
+- **Database Optimization**: Composite indexes on frequently queried columns
+- **Field Selection**: Only fetch needed fields from the database
+- **API Versioning**: All routes under `/v1` prefix for future compatibility
 
-- **CORS Configuration** - Add proper CORS headers for production frontend integration with configurable allowed origins
+### Admin Features
+- **Admin API Key**: Special endpoint to get all users (including deleted) with API key authentication
 
-- **Authentication & Authorization** - Implement JWT-based authentication with role-based access control
+## API Documentation
 
-### Medium Priority
+Complete API documentation is in [API.md](./API.md). It covers all endpoints with request/response examples.
 
-- **Message Filtering** - Add query parameters to filter messages:
-  - `?senderId=xxx` - Get messages from specific sender
-  - `?receiverId=xxx` - Get messages to specific receiver
-  - `?startDate=xxx&endDate=xxx` - Filter by date range
+Quick overview of main endpoints:
 
-## What Works
+**Authentication:**
+- `POST /v1/auth/register` - Create account
+- `POST /v1/auth/login` - Login
+- `POST /v1/auth/refresh` - Refresh access token
 
-- Messages: create, read (with pagination), update, delete
-- Replies to messages (hierarchical)
-- Sorting (by date or content)
-- Validation (UUIDs, required fields, etc.)
-- Health check endpoint
-- Swagger docs
-- Request logging
+**Users:**
+- `GET /v1/users/me` - Your profile
+- `DELETE /v1/users/:id` - Delete your account
+- `GET /v1/users` - Get all users (requires admin API key)
 
-## What's Missing
+**Groups:**
+- `POST /v1/groups` - Create a group
+- `GET /v1/groups` - Your groups
+- `POST /v1/groups/:id/members` - Add members (admin only)
+- `PATCH /v1/groups/:id/members/:userId/role` - Promote/demote members (admin only)
 
-Some stuff I'd add if this were production:
+**Messages:**
+- `POST /messages` - Send a message (direct or group)
+- `GET /messages` - Your messages (paginated)
+- `PATCH /messages/:id` - Edit your message
+- `DELETE /messages/:id` - Delete your message
+- `GET /messages/:id/replies` - View message thread
 
-- **Soft delete** - So we don't loose the message, better for auditing
-- **Bulk operations** - Like deleting multiple messages
-- **Tests with a dedicated test database** - Currently e2e tests hit the dev db
-- **Caching** - Redis for frequently accessed messages or user's status
-- **Auth** - No login/permissions yet
-- **WebSockets** - Real-time updates would be nice
-- **Field selection** - Let clients pick which fields they want back
-- **More environments** - Just dev right now
+## Development
 
-## Tests
+If you want to run it locally without Docker:
 
-Got unit tests, integration tests, and e2e tests. Run with `npm test` or `npm run test:e2e` (needs the db running).
+```bash
+# Install dependencies
+npm install
 
-Coverage includes:
-- Message CRUD
-- Pagination & sorting
-- Input validation  
-- Error handling
-- Reply chains
+# Set up .env file (copy from .env.example)
+cp .env.example .env
+
+# Make sure PostgreSQL and Redis are running locally
+# Update DATABASE_URL in .env to point to your local DB
+
+# Run migrations and seed
+npm run prisma:migrate
+npm run prisma:seed
+
+# Start in dev mode
+npm run dev
+```
+
+The API will be available at http://localhost:3000
+
+## Testing
+
+```bash
+# Run unit tests
+npm test
+
+# Run e2e tests (needs database running)
+npm run test:e2e
+```
+
+Tests cover:
+- Message CRUD operations
+- Cursor-based pagination logic
+- Input validation
+- Error scenarios (404s, validation failures)
 - Health checks
 
-The e2e tests clean up after themselves.
+Note: Auth and group tests would be added in a full implementation.
 
-## Design Decisions & Trade-offs
+## Design Decisions
 
-**NestJS over Express** - Went with NestJS because it provides structure out of the box (dependency injection, modules, decorators). Trade-off: slightly more boilerplate, but scales better for team projects.
+A few notes on choices I made:
 
-**Prisma ORM** - Chose Prisma for type-safe database queries and easy migrations. The generated client catches errors at compile time. Trade-off: adds a build step, but worth it for the developer experience.
+**Why NestJS?** It provides good structure with dependency injection, decorators, and modules. Makes the codebase easier to navigate and maintain compared to plain Express.
 
-**Hard delete vs Soft delete** - Currently using hard delete for simplicity. In production, I'd use soft delete (a `deleted` flag) for audit trails and data recovery.
+**Why Prisma?** Type-safe database queries are great. You catch errors at compile time instead of runtime. Plus migrations are straightforward.
 
-**Page-based pagination** - Implemented offset/limit pagination because it's intuitive and supports jumping to specific pages. Trade-off: slower with huge datasets (millions of records), but fine for most use cases.
+**JWT Tokens:** Using access + refresh token pattern. Access tokens expire quickly (15 min) for security, refresh tokens last 7 days. In production I'd add token rotation and a revocation list in Redis.
 
-**PATCH over PUT** - Used PATCH for updates since only `content` is editable. PUT would require sending all fields. This prevents accidental overwrites.
+**Cursor Pagination:** Went with cursor-based instead of offset pagination because it handles new data better. If someone sends a message while you're browsing, you won't see duplicates or skip messages.
 
-**Monolithic structure** - Everything in one service for now. For scale, I'd split into microservices (message service, user service, notification service). Trade-off: simpler deployment vs. harder to scale individual components.
+**Soft Delete:** Users are soft-deleted (marked as deleted, not actually removed). Keeps message history intact and allows for account recovery if needed.
 
-**Rate limiting globally** - Applied rate limiting at the app level (100 req/min). Should be more granular in production - tighter limits on POST, looser on GET.
+**Redis Caching:** Group membership checks are cached because they're read frequently but change rarely. As the project would expand we could approach this caching strategy on differente perspectives such as user status on chat
 
-**Docker Compose for local dev** - Makes setup a one-liner (`npm run docker:up`). Trade-off: requires Docker installed, but eliminates "works on my machine" issues.
+**Security:** Passwords hashed with bcrypt (10 rounds), phone numbers validated to E.164 format, all IDs are UUIDs to prevent enumeration attacks. Users can only edit/delete their own messages.
+
+## What I'd Add With More Time
+
+**WebSockets:** Real-time message delivery would be nice. Right now it's REST-only so clients need to poll.
+
+**Read Receipts:** Track when messages are read, show "read by" status.
+
+**Message Search:** Full-text search across message content. Would probably use PostgreSQL's built-in full-text search or Elasticsearch.
+
+**File Attachments:** Support for sending images, documents, etc. Would need file upload to a blob storage such as S3 or similar.
+
+**Push Notifications:** Alert users of new messages when they're offline.
+
+**More Granular Permissions:** Currently groups just have admins and members but the usage of an admin in a group is not implemented due to time constraints of this delivery + out of scope for this current MVP. We could also add moderators, custom roles, etc.
+
+**Better Rate Limiting:** Right now it's 100 req/min globally. Should be per-endpoint with different limits (stricter on POST, looser on GET).
+
+**Observability:** Add proper logging with Winston or Pino, metrics with Prometheus, distributed tracing etc.
+
+**More Tests:** Current coverage is decent but could add more edge cases, load tests, and chaos testing.
+
+**Refresh Token Storage:** Currently storing refresh tokens in PostgreSQL for simplicity. In production I'd migrate to Redis for faster lookups (O(1) vs table scan), automatic TTL expiration, and multi-device session management. Would reduce database load since token refresh happens frequently.
+
+**Database Scaling:** For production at scale, I'd configure explicit connection pooling limits based on load testing (Prisma uses defaults which work for most cases, but tuning `connection_limit` and `pool_timeout` in the DATABASE_URL can prevent connection exhaustion under heavy load). Also consider read replicas for scaling read operations, and potentially database sharding for very large datasets.
+
+## Project Structure
+
+```
+src/
+├── auth/           # Authentication (JWT, guards, strategies)
+├── users/          # User management
+├── groups/         # Group chat functionality
+├── messages/       # Messaging (CRUD, replies)
+├── cache/          # Redis caching layer
+├── prisma/         # Database client
+├── health/         # Health check endpoint
+└── common/         # Shared middleware, decorators
+```
+
+Each module follows the same pattern: controller → service → database. Keeps things consistent and easy to find.
+
+## Performance Optimizations
+
+Things I did to make it faster:
+
+1. **Composite indexes** on `(createdAt, id)` for efficient cursor pagination
+2. **Redis caching** for group membership checks (a lot of DB queries will be skipped due to this)
+3. **Field selection** - only fetch the fields we actually need
+4. **findUnique instead of findFirst** where possible (faster lookups)
+
+## Environment Variables
+
+Key environment variables (see `.env.example`):
+
+- `DATABASE_URL` - PostgreSQL connection string
+- `JWT_SECRET` - Secret for signing access tokens
+- `JWT_REFRESH_SECRET` - Secret for signing refresh tokens
+- `ADMIN_API_KEY` - API key for admin endpoints
+- `REDIS_HOST` / `REDIS_PORT` - Redis connection for caching
+- `PORT` - API port (default 3000)

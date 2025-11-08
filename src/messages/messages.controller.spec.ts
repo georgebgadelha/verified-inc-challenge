@@ -1,15 +1,22 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication, ValidationPipe, ExecutionContext } from '@nestjs/common';
 import request from 'supertest';
 import { MessagesController } from './messages.controller';
 import { MessagesService } from './messages.service';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { UpdateMessageDto } from './dto/update-message.dto';
 import { MessageEntity } from './entities/message.entity';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 describe('MessagesController (Integration)', () => {
   let app: INestApplication;
   let messagesService: MessagesService;
+
+  const mockUser = {
+    id: 'b1c2d3e4-f5a6-4890-b123-fa1234567890',
+    phoneNumber: '+1234567890',
+    name: 'Test User',
+  };
 
   const mockMessage = {
     id: 'a1b2c3d4-e5f6-4890-a123-ef1234567890',
@@ -44,6 +51,14 @@ describe('MessagesController (Integration)', () => {
     findReplies: jest.fn(),
   };
 
+  const mockJwtAuthGuard = {
+    canActivate: (context: ExecutionContext) => {
+      const req = context.switchToHttp().getRequest();
+      req.user = mockUser;
+      return true;
+    },
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [MessagesController],
@@ -53,7 +68,10 @@ describe('MessagesController (Integration)', () => {
           useValue: mockMessagesService,
         },
       ],
-    }).compile();
+    })
+      .overrideGuard(JwtAuthGuard)
+      .useValue(mockJwtAuthGuard)
+      .compile();
 
     app = module.createNestApplication();
     app.useGlobalPipes(
@@ -76,7 +94,6 @@ describe('MessagesController (Integration)', () => {
   describe('POST /messages', () => {
     const createDto: CreateMessageDto = {
       content: 'Test message',
-      senderId: 'b1c2d3e4-f5a6-4890-b123-fa1234567890',
       receiverId: 'c1d2e3f4-a5b6-4890-8123-ab1234567890',
     };
 
@@ -92,7 +109,10 @@ describe('MessagesController (Integration)', () => {
         id: mockMessage.id,
         content: mockMessage.content,
       });
-      expect(mockMessagesService.create).toHaveBeenCalled();
+      expect(mockMessagesService.create).toHaveBeenCalledWith(
+        mockUser.id,
+        createDto,
+      );
     });
 
     it('should return 400 for invalid payload', () => {
@@ -102,13 +122,12 @@ describe('MessagesController (Integration)', () => {
         .expect(400);
     });
 
-    it('should validate senderId is UUID', () => {
+    it('should validate receiverId is UUID', () => {
       return request(app.getHttpServer())
         .post('/messages')
         .send({
           content: 'Test',
-          senderId: 'invalid-uuid',
-          receiverId: 'c1d2e3f4-a5b6-4890-8123-ab1234567890',
+          receiverId: 'invalid-uuid',
         })
         .expect(400);
     });
@@ -133,7 +152,12 @@ describe('MessagesController (Integration)', () => {
         .expect(200)
         .expect((res) => {
           expect(res.body).toEqual(mockPaginatedResponse);
-          expect(mockMessagesService.findAll).toHaveBeenCalledWith(1, 20, 'desc');
+          expect(mockMessagesService.findAll).toHaveBeenCalledWith(
+            mockUser.id,
+            undefined,
+            20,
+            'desc',
+          );
         });
     });
 
@@ -141,10 +165,15 @@ describe('MessagesController (Integration)', () => {
       mockMessagesService.findAll.mockResolvedValue(mockPaginatedResponse);
 
       return request(app.getHttpServer())
-        .get('/messages?page=2&limit=10')
+        .get('/messages?limit=10')
         .expect(200)
         .expect(() => {
-          expect(mockMessagesService.findAll).toHaveBeenCalledWith(2, 10, 'desc');
+          expect(mockMessagesService.findAll).toHaveBeenCalledWith(
+            mockUser.id,
+            undefined,
+            10,
+            'desc',
+          );
         });
     });
 
@@ -155,18 +184,28 @@ describe('MessagesController (Integration)', () => {
         .get('/messages?sort=asc')
         .expect(200)
         .expect(() => {
-          expect(mockMessagesService.findAll).toHaveBeenCalledWith(1, 20, 'asc');
+          expect(mockMessagesService.findAll).toHaveBeenCalledWith(
+            mockUser.id,
+            undefined,
+            20,
+            'asc',
+          );
         });
     });
 
-    it('should enforce minimum page value of 1', () => {
+    it('should accept cursor parameter', () => {
       mockMessagesService.findAll.mockResolvedValue(mockPaginatedResponse);
 
       return request(app.getHttpServer())
-        .get('/messages?page=0')
+        .get('/messages?cursor=2025-11-04T05:47:47.775Z_a1b2c3d4')
         .expect(200)
         .expect(() => {
-          expect(mockMessagesService.findAll).toHaveBeenCalledWith(1, 20, 'desc');
+          expect(mockMessagesService.findAll).toHaveBeenCalledWith(
+            mockUser.id,
+            '2025-11-04T05:47:47.775Z_a1b2c3d4',
+            20,
+            'desc',
+          );
         });
     });
 
@@ -177,7 +216,12 @@ describe('MessagesController (Integration)', () => {
         .get('/messages?limit=200')
         .expect(200)
         .expect(() => {
-          expect(mockMessagesService.findAll).toHaveBeenCalledWith(1, 100, 'desc');
+          expect(mockMessagesService.findAll).toHaveBeenCalledWith(
+            mockUser.id,
+            undefined,
+            100,
+            'desc',
+          );
         });
     });
   });

@@ -16,19 +16,46 @@ services:
       timeout: 3s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    command: redis-server --appendonly yes
+
   api:
-    build: .
+    build: 
+      context: .
+      cache_from:
+        - verifiedinc-challenge-api:latest
+      args:
+        BUILDKIT_INLINE_CACHE: 1
+    image: verifiedinc-challenge-api:latest
     ports:
       - "3000:3000"
     environment:
       NODE_ENV: production
       PORT: 3000
       DATABASE_URL: postgresql://postgres:password@db:5432/chat_db
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: dev-jwt-secret-change-in-production
+      JWT_REFRESH_SECRET: dev-jwt-refresh-secret-change-in-production
+      ADMIN_API_KEY: dev-admin-key-12345-change-in-production
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     stop_grace_period: 2s # Purely for demo purposes
 
 volumes:
   db_data:
+  redis_data:
 

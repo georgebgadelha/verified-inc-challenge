@@ -20,21 +20,62 @@ export class MessageEntity {
   })
   content: string;
 
-  /** UUID of the sender */
+  /** UUID of the sender (null if user was deleted) */
   @ApiProperty({
-    description: 'UUID of the user who sent the message',
+    description: 'UUID of the user who sent the message (null if user was deleted)',
     example: '550e8400-e29b-41d4-a716-446655440001',
     format: 'uuid',
+    nullable: true,
   })
-  senderId: string;
+  senderId: string | null;
 
-  /** UUID of the receiver */
+  /** UUID of the receiver (null if user was deleted or if group message) */
   @ApiProperty({
-    description: 'UUID of the user who received the message',
+    description: 'UUID of the user who received the message (null if user was deleted or if group message)',
     example: '550e8400-e29b-41d4-a716-446655440002',
     format: 'uuid',
+    nullable: true,
   })
-  receiverId: string;
+  receiverId: string | null;
+
+  /** UUID of the group (null if direct message) */
+  @ApiProperty({
+    description: 'UUID of the group (null if direct message)',
+    example: '550e8400-e29b-41d4-a716-446655440003',
+    format: 'uuid',
+    nullable: true,
+  })
+  groupId: string | null;
+
+  /** Name of the sender at time of message creation */
+  @ApiProperty({
+    description: 'Name of the sender (preserved even if user deleted)',
+    example: 'Alice',
+  })
+  senderName: string;
+
+  /** Phone of the sender at time of message creation */
+  @ApiProperty({
+    description: 'Phone number of the sender (preserved even if user deleted)',
+    example: '+1234567890',
+  })
+  senderPhone: string;
+
+  /** Name of the receiver at time of message creation (null for group messages) */
+  @ApiProperty({
+    description: 'Name of the receiver (preserved even if user deleted, null for group messages)',
+    example: 'Bob',
+    nullable: true,
+  })
+  receiverName: string | null;
+
+  /** Phone of the receiver at time of message creation (null for group messages) */
+  @ApiProperty({
+    description: 'Phone number of the receiver (preserved even if user deleted, null for group messages)',
+    example: '+0987654321',
+    nullable: true,
+  })
+  receiverPhone: string | null;
 
   /** UUID of the parent message if this is a reply, null otherwise */
   @ApiProperty({

@@ -8,18 +8,58 @@ datasource db {
 }
 
 model User {
-  id          String   @id @default(uuid())
-  name        String
-  email       String   @unique
-  phoneNumber String   @unique
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  phoneNumber  String   @unique
+  password     String
+  refreshToken String?
+  isDeleted    Boolean  @default(false)
+  deletedAt    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  sentMessages     Message[] @relation("SentMessages")
-  receivedMessages Message[] @relation("ReceivedMessages")
+  sentMessages     Message[]     @relation("SentMessages")
+  receivedMessages Message[]     @relation("ReceivedMessages")
+  groupMemberships GroupMember[]
+  createdGroups    Group[]       @relation("GroupCreator")
 
   @@map("users")
   @@index([phoneNumber])
+  @@index([email])
+  @@index([isDeleted])
+}
+
+model Group {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  createdBy User          @relation("GroupCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  members   GroupMember[]
+  messages  Message[]
+
+  @@map("groups")
+  @@index([createdById])
+}
+
+model GroupMember {
+  id        String   @id @default(uuid())
+  groupId   String
+  userId    String
+  role      String   @default("member") // "admin" or "member"
+  joinedAt  DateTime @default(now())
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId]) // A user can only be in a group once
+  @@map("group_members")
+  @@index([groupId])
+  @@index([userId])
 }
 
 model Message {
@@ -28,11 +68,24 @@ model Message {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  senderId   String
-  receiverId String
+  // For direct messages (1-on-1)
+  senderId   String?
+  receiverId String?
 
-  sender   User @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
-  receiver User @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+  // For group messages
+  groupId String?
+
+  // Denormalized user data - snapshot at message creation time
+  // These remain even after user deletion
+  senderName  String
+  senderPhone String
+  // For direct messages only
+  receiverName  String?
+  receiverPhone String?
+
+  sender   User?  @relation("SentMessages", fields: [senderId], references: [id], onDelete: SetNull)
+  receiver User?  @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: SetNull)
+  group    Group? @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
   // Reply functionality - a message can reply to another message
   replyToId String?
@@ -42,5 +95,7 @@ model Message {
   @@map("messages")
   @@index([senderId])
   @@index([receiverId])
+  @@index([groupId])
   @@index([replyToId])
+  @@index([createdAt, id]) // Composite index for cursor-based pagination
 }

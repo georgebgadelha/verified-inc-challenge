@@ -2,12 +2,14 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { MessagesService } from './messages.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { GroupsService } from '../groups/groups.service';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { UpdateMessageDto } from './dto/update-message.dto';
 
 describe('MessagesService', () => {
   let service: MessagesService;
   let prismaService: PrismaService;
+  let groupsService: GroupsService;
 
   // Mock data
   const mockUser = {
@@ -25,6 +27,10 @@ describe('MessagesService', () => {
     senderId: 'user-123',
     receiverId: 'user-456',
     replyToId: null,
+    senderName: 'Test User',
+    senderPhone: '1234567890',
+    receiverName: 'Test User',
+    receiverPhone: '1234567890',
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -37,6 +43,10 @@ describe('MessagesService', () => {
       senderId: 'user-456',
       receiverId: 'user-123',
       replyToId: null,
+      senderName: 'Test User',
+      senderPhone: '1234567890',
+      receiverName: 'Test User',
+      receiverPhone: '1234567890',
       createdAt: new Date(),
       updatedAt: new Date(),
     },
@@ -57,6 +67,11 @@ describe('MessagesService', () => {
     },
   };
 
+  // Mock GroupsService
+  const mockGroupsService = {
+    isMember: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -65,11 +80,16 @@ describe('MessagesService', () => {
           provide: PrismaService,
           useValue: mockPrismaService,
         },
+        {
+          provide: GroupsService,
+          useValue: mockGroupsService,
+        },
       ],
     }).compile();
 
     service = module.get<MessagesService>(MessagesService);
     prismaService = module.get<PrismaService>(PrismaService);
+    groupsService = module.get<GroupsService>(GroupsService);
 
     // Reset all mocks before each test
     jest.clearAllMocks();
@@ -80,9 +100,9 @@ describe('MessagesService', () => {
   });
 
   describe('create', () => {
+    const senderId = 'user-123';
     const createMessageDto: CreateMessageDto = {
       content: 'Test message',
-      senderId: 'user-123',
       receiverId: 'user-456',
     };
 
@@ -90,7 +110,7 @@ describe('MessagesService', () => {
       mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
       mockPrismaService.message.create.mockResolvedValue(mockMessage);
 
-      const result = await service.create(createMessageDto);
+      const result = await service.create(senderId, createMessageDto);
 
       expect(result).toEqual(expect.objectContaining({
         id: mockMessage.id,
@@ -100,9 +120,13 @@ describe('MessagesService', () => {
       expect(mockPrismaService.message.create).toHaveBeenCalledWith({
         data: {
           content: createMessageDto.content,
-          senderId: createMessageDto.senderId,
+          senderId: senderId,
           receiverId: createMessageDto.receiverId,
           replyToId: undefined,
+          senderName: mockUser.name,
+          senderPhone: mockUser.phoneNumber,
+          receiverName: mockUser.name,
+          receiverPhone: mockUser.phoneNumber,
         },
       });
     });
@@ -110,8 +134,8 @@ describe('MessagesService', () => {
     it('should throw BadRequestException if sender does not exist', async () => {
       mockPrismaService.user.findUnique.mockResolvedValue(null); // sender not found
 
-      await expect(service.create(createMessageDto)).rejects.toThrow(BadRequestException);
-      await expect(service.create(createMessageDto)).rejects.toThrow('Sender with ID user-123 not found');
+      await expect(service.create(senderId, createMessageDto)).rejects.toThrow(BadRequestException);
+      await expect(service.create(senderId, createMessageDto)).rejects.toThrow('Sender with ID user-123 not found');
     });
 
     it('should throw BadRequestException if receiver does not exist', async () => {
@@ -119,7 +143,7 @@ describe('MessagesService', () => {
         .mockResolvedValueOnce(mockUser) // sender exists
         .mockResolvedValueOnce(null); // receiver not found
 
-      await expect(service.create(createMessageDto)).rejects.toThrow(BadRequestException);
+      await expect(service.create(senderId, createMessageDto)).rejects.toThrow(BadRequestException);
     });
 
     it('should validate replyToId if provided', async () => {
@@ -135,7 +159,7 @@ describe('MessagesService', () => {
         replyToId: 'message-789',
       });
 
-      const result = await service.create(createWithReply);
+      const result = await service.create(senderId, createWithReply);
 
       expect(result.replyToId).toBe('message-789');
       expect(mockPrismaService.message.findUnique).toHaveBeenCalledWith({
@@ -152,100 +176,113 @@ describe('MessagesService', () => {
       mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
       mockPrismaService.message.findUnique.mockResolvedValueOnce(null); // replyTo message not found
 
-      await expect(service.create(createWithReply)).rejects.toThrow(BadRequestException);
-      await expect(service.create(createWithReply)).rejects.toThrow(
+      await expect(service.create(senderId, createWithReply)).rejects.toThrow(BadRequestException);
+      await expect(service.create(senderId, createWithReply)).rejects.toThrow(
         'Reply target message with ID nonexistent-message not found'
       );
     });
   });
 
   describe('findAll', () => {
-    it('should return paginated messages with default parameters', async () => {
-      mockPrismaService.message.count.mockResolvedValue(2);
-      mockPrismaService.message.findMany.mockResolvedValue(mockMessages);
+    const testUserId = 'user-123';
 
-      const result = await service.findAll();
+    it('should return paginated messages for a user with default parameters', async () => {
+      mockPrismaService.message.findMany.mockResolvedValue([mockMessage]);
 
-      expect(result.data).toHaveLength(2);
-      expect(result.meta).toEqual({
-        currentPage: 1,
-        pageSize: 20,
-        totalItems: 2,
-        totalPages: 1,
-        hasNextPage: false,
-        hasPreviousPage: false,
-        nextPage: null,
-        previousPage: null,
-      });
+      const result = await service.findAll(testUserId);
+
+      expect(result.data).toHaveLength(1);
+      expect(result.meta.count).toBe(1);
+      expect(result.meta.limit).toBe(20);
+      expect(result.meta.hasMore).toBe(false);
       expect(mockPrismaService.message.findMany).toHaveBeenCalledWith({
-        take: 20,
-        skip: 0,
-        orderBy: { createdAt: 'desc' },
+        where: {
+          OR: [
+            { senderId: testUserId },
+            { receiverId: testUserId }
+          ]
+        },
+        take: 21, // limit + 1
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       });
     });
 
-    it('should support custom page and limit', async () => {
-      mockPrismaService.message.count.mockResolvedValue(50);
-      mockPrismaService.message.findMany.mockResolvedValue([mockMessage]);
+    it('should support custom limit', async () => {
+      const mockMessages = [mockMessage];
+      mockPrismaService.message.findMany.mockResolvedValue(mockMessages);
 
-      const result = await service.findAll(2, 10);
+      const result = await service.findAll(testUserId, undefined, 10);
 
       expect(result.meta).toEqual({
-        currentPage: 2,
-        pageSize: 10,
-        totalItems: 50,
-        totalPages: 5,
-        hasNextPage: true,
-        hasPreviousPage: true,
-        nextPage: 3,
-        previousPage: 1,
+        count: 1,
+        limit: 10,
+        nextCursor: null,
+        prevCursor: `${mockMessage.createdAt.toISOString()}_${mockMessage.id}`,
+        hasMore: false,
       });
       expect(mockPrismaService.message.findMany).toHaveBeenCalledWith({
-        take: 10,
-        skip: 10, // (page 2 - 1) * 10
-        orderBy: { createdAt: 'desc' },
+        where: {
+          OR: [
+            { senderId: testUserId },
+            { receiverId: testUserId }
+          ]
+        },
+        take: 11, // limit + 1 to check for more
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       });
     });
 
     it('should support ascending sort order', async () => {
-      mockPrismaService.message.count.mockResolvedValue(2);
       mockPrismaService.message.findMany.mockResolvedValue(mockMessages);
 
-      await service.findAll(1, 20, 'asc');
+      await service.findAll(testUserId, undefined, 20, 'asc');
 
       expect(mockPrismaService.message.findMany).toHaveBeenCalledWith({
-        take: 20,
-        skip: 0,
-        orderBy: { createdAt: 'asc' },
+        where: {
+          OR: [
+            { senderId: testUserId },
+            { receiverId: testUserId }
+          ]
+        },
+        take: 21,
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       });
     });
 
     it('should return empty data array when no messages exist', async () => {
-      mockPrismaService.message.count.mockResolvedValue(0);
       mockPrismaService.message.findMany.mockResolvedValue([]);
 
-      const result = await service.findAll();
+      const result = await service.findAll(testUserId);
 
       expect(result.data).toEqual([]);
-      expect(result.meta.totalItems).toBe(0);
-      expect(result.meta.totalPages).toBe(0);
+      expect(result.meta.count).toBe(0);
+      expect(result.meta.hasMore).toBe(false);
     });
 
-    it('should calculate pagination metadata correctly for last page', async () => {
-      mockPrismaService.message.count.mockResolvedValue(25);
+    it('should use cursor for pagination', async () => {
+      const cursor = '2023-11-07T12:00:00.000Z_message-123';
       mockPrismaService.message.findMany.mockResolvedValue([mockMessage]);
 
-      const result = await service.findAll(3, 10); // page 3 of 3
+      const result = await service.findAll(testUserId, cursor, 10);
 
-      expect(result.meta).toEqual({
-        currentPage: 3,
-        pageSize: 10,
-        totalItems: 25,
-        totalPages: 3,
-        hasNextPage: false,
-        hasPreviousPage: true,
-        nextPage: null,
-        previousPage: 2,
+      expect(mockPrismaService.message.findMany).toHaveBeenCalledWith({
+        where: {
+          OR: [
+            { senderId: testUserId },
+            { receiverId: testUserId }
+          ],
+          AND: {
+            OR: [
+              { createdAt: { lt: new Date('2023-11-07T12:00:00.000Z') } },
+              {
+                createdAt: new Date('2023-11-07T12:00:00.000Z'),
+                id: { lt: 'message-123' }
+              }
+            ]
+          }
+        },
+        take: 11,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       });
     });
   });

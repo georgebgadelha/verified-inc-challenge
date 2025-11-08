@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MessagesService } from './messages.service';
 import { MessagesController } from './messages.controller';
+import { GroupsModule } from '../groups/groups.module';
 
 /**
  * MessagesModule encapsulates all message-related functionality.
@@ -15,6 +16,7 @@ import { MessagesController } from './messages.controller';
  * so we don't need to import PrismaModule here.
  */
 @Module({
+  imports: [GroupsModule],
   controllers: [MessagesController],
   providers: [MessagesService],
   exports: [MessagesService],

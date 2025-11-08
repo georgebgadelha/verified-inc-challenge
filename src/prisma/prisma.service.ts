@@ -13,10 +13,16 @@ import { PrismaClient } from '@prisma/client';
  */
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+  /**
+   * Connect to database when module initializes.
+   */
   async onModuleInit() {
     await this.$connect();
   }
 
+  /**
+   * Disconnect from database when module is destroyed.
+   */
   async onModuleDestroy() {
     await this.$disconnect();
   }
