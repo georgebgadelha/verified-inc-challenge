@@ -50,7 +50,7 @@ npm run docker:down
 ## What's Implemented
 
 ### Core Features
-- **User Authentication**: Register, login with JWT tokens (15-min access, 7-day refresh)
+- **User Authentication**: Register, login with JWT tokens (15-min access, 7-day refresh with automatic rotation)
 - **User Management**: Get profile, delete account (soft delete)
 - **Direct Messages**: Send messages to other users
 - **Group Chats**: Create groups, add/remove members, assign admin roles
@@ -154,7 +154,7 @@ A few notes on choices I made:
 
 **Why Prisma?** Type-safe database queries are great. You catch errors at compile time instead of runtime. Plus migrations are straightforward.
 
-**JWT Tokens:** Using access + refresh token pattern. Access tokens expire quickly (15 min) for security, refresh tokens last 7 days. In production I'd add token rotation and a revocation list in Redis.
+**JWT Tokens:** Using access + refresh token pattern with refresh token rotation. Access tokens expire quickly (15 min) for security, refresh tokens last 7 days but are rotated on each refresh (keeps active users logged in indefinitely while limiting exposure if a token is compromised).
 
 **Cursor Pagination:** Went with cursor-based instead of offset pagination because it handles new data better. If someone sends a message while you're browsing, you won't see duplicates or skip messages.
 

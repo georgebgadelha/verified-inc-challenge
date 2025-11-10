@@ -106,7 +106,7 @@ Login with existing credentials.
 ### Refresh Token
 **POST** `/v1/auth/refresh`
 
-Get a new access token using your refresh token.
+Get a new access token (and new refresh token) using your current refresh token. Implements refresh token rotation for security.
 
 **Request:**
 ```json
@@ -118,9 +118,19 @@ Get a new access token using your refresh token.
 **Response:** `200 OK`
 ```json
 {
-  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 }
 ```
+
+**Notes:**
+- Returns both a new access token (15 min) and a new refresh token (7 days)
+- The old refresh token becomes invalid immediately (token rotation)
+- Frontend must store the new refresh token for the next refresh
+- If refresh token is expired (7 days), user must login again
+
+**Errors:**
+- `401 Unauthorized` - Invalid or expired refresh token
 
 ---
 
@@ -561,7 +571,7 @@ Delete your own message. Only the sender can delete.
 ### Get Message Replies
 **GET** `/v1/messages/:id/replies`
 
-Get all replies to a specific message, sorted oldest first.
+Get all replies to a specific message (threaded conversation).
 
 **Response:** `200 OK`
 ```json
@@ -576,6 +586,55 @@ Get all replies to a specific message, sorted oldest first.
   }
 ]
 ```
+
+---
+
+### Get Group Messages
+**GET** `/v1/groups/:id/messages?cursor=xxx&limit=20&sort=desc`
+
+Get all messages for a specific group. Only group members can view. Uses cursor-based pagination.
+
+**Path Parameters:**
+- `id` (required) - UUID of the group
+
+**Query Parameters:**
+- `cursor` (optional) - Pagination cursor from `meta.nextCursor`
+- `limit` (optional) - Messages per page (default: 20, max: 100)
+- `sort` (optional) - Sort order: `asc` or `desc` (default: `desc`)
+
+**Response:** `200 OK`
+```json
+{
+  "data": [
+    {
+      "id": "msg-789",
+      "content": "Hello everyone!",
+      "senderId": "user-1",
+      "receiverId": null,
+      "groupId": "group-123",
+      "replyToId": null,
+      "senderName": "John Doe",
+      "senderPhone": "+1234567890",
+      "receiverName": null,
+      "receiverPhone": null,
+      "createdAt": "2025-11-07T10:00:00.000Z",
+      "updatedAt": "2025-11-07T10:00:00.000Z"
+    }
+  ],
+  "meta": {
+    "count": 20,
+    "limit": 20,
+    "nextCursor": "2025-11-07T10:00:00.000Z_msg-789",
+    "prevCursor": "2025-11-07T09:00:00.000Z_msg-001",
+    "hasMore": true
+  }
+}
+```
+
+**Errors:**
+- `400 Bad Request` - Invalid cursor format or not a group member
+- `404 Not Found` - Group doesn't exist
+- `401 Unauthorized` - Not authenticated
 
 ---
 

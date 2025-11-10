@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MessagesService } from './messages.service';
 import { MessagesController } from './messages.controller';
 import { GroupsModule } from '../groups/groups.module';
@@ -16,7 +16,7 @@ import { GroupsModule } from '../groups/groups.module';
  * so we don't need to import PrismaModule here.
  */
 @Module({
-  imports: [GroupsModule],
+  imports: [forwardRef(() => GroupsModule)],
   controllers: [MessagesController],
   providers: [MessagesService],
   exports: [MessagesService],

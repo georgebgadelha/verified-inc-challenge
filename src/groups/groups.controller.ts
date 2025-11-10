@@ -8,8 +8,9 @@ import {
   Delete,
   UseGuards,
   Request,
+  Query,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { GroupsService } from './groups.service';
 import { CreateGroupDto } from './dto/create-group.dto';
 import { UpdateGroupDto } from './dto/update-group.dto';
@@ -17,6 +18,8 @@ import { AddMembersDto } from './dto/add-members.dto';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
 import { GroupEntity } from './entities/group.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { MessagesService } from '../messages/messages.service';
+import { PaginatedMessagesDto } from '../messages/dto/paginated-messages.dto';
 
 /**
  * Groups controller handling group chat creation and management.
@@ -27,7 +30,10 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 @UseGuards(JwtAuthGuard)
 @Controller('groups')
 export class GroupsController {
-  constructor(private readonly groupsService: GroupsService) {}
+  constructor(
+    private readonly groupsService: GroupsService,
+    private readonly messagesService: MessagesService,
+  ) {}
 
   /**
    * Create a new group chat with initial members.
@@ -217,5 +223,47 @@ export class GroupsController {
       userId,
       updateMemberRoleDto.role,
     );
+  }
+
+  /**
+   * Get all messages for a specific group with pagination.
+   * Only group members can view group messages.
+   * @param id - Group UUID
+   * @param cursor - Optional cursor for pagination (from meta.nextCursor of previous response)
+   * @param limit - Messages per page (default: 20, max: 100)
+   * @param sort - Sort order: 'asc' (oldest first) or 'desc' (newest first, default)
+   * @param req - Request object containing authenticated user
+   * @returns Paginated response with group messages and cursor metadata
+   */
+  @Get(':id/messages')
+  @ApiOperation({ 
+    summary: 'Get messages for a specific group', 
+    description: 'Retrieve all messages in a group (requires group membership). Uses cursor-based pagination for consistent results.' 
+  })
+  @ApiParam({ name: 'id', description: 'Group UUID', type: String })
+  @ApiQuery({ 
+    name: 'cursor', 
+    required: false, 
+    type: String, 
+    description: 'Cursor for pagination (format: timestamp_id). Get from meta.nextCursor of previous response.' 
+  })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Messages per page (default: 20, min: 1, max: 100)' })
+  @ApiQuery({ name: 'sort', required: false, enum: ['asc', 'desc'], description: 'Sort order (default: desc = newest first)' })
+  @ApiResponse({ status: 200, description: 'Group messages retrieved successfully', type: PaginatedMessagesDto })
+  @ApiResponse({ status: 400, description: 'Invalid cursor format or user not a group member' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Group not found' })
+  async getGroupMessages(
+    @Param('id') id: string,
+    @Request() req,
+    @Query('cursor') cursor?: string,
+    @Query('limit') limit?: number,
+    @Query('sort') sort?: 'asc' | 'desc',
+  ): Promise<PaginatedMessagesDto> {
+    // Validate and constrain inputs
+    const validLimit = limit ? Math.max(1, Math.min(limit, 100)) : 20;
+    const validSort = sort === 'asc' || sort === 'desc' ? sort : 'desc';
+    
+    return this.messagesService.findGroupMessages(id, req.user.id, cursor, validLimit, validSort);
   }
 }

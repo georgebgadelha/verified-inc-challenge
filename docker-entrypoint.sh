@@ -8,7 +8,7 @@ echo "🔄 Ensuring database schema is up to date..."
 npx prisma db push --skip-generate
 
 echo "🌱 Seeding database (if needed)..."
-npx prisma db seed 2>&1 | grep -v "Unique constraint failed" || echo "Seed complete or already applied"
+npx prisma db seed > /dev/null 2>&1 || true
 
 echo "Starting application..."
 exec "$@"

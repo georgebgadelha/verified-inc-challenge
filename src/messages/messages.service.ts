@@ -260,6 +260,128 @@ export class MessagesService {
   }
 
   /**
+   * Get messages for a specific group with cursor-based pagination.
+   * Validates user is a member of the group before returning messages.
+   * @param groupId - The ID of the group
+   * @param userId - The ID of the authenticated user (must be a member)
+   * @param cursor - Optional cursor for pagination (format: "timestamp_id")
+   * @param limit - Number of messages per page (default: 20, max: 100)
+   * @param sort - Sort order: 'asc' (oldest first) or 'desc' (newest first, default)
+   * @returns Paginated response with group messages and cursor metadata
+   */
+  async findGroupMessages(
+    groupId: string,
+    userId: string,
+    cursor?: string,
+    limit: number = 20,
+    sort: 'asc' | 'desc' = 'desc',
+  ): Promise<PaginatedMessagesDto> {
+    // Validate group exists
+    await this.validateGroupExists(groupId);
+
+    // Validate user is a member of the group
+    const isMember = await this.groupsService.isMember(userId, groupId);
+    if (!isMember) {
+      throw new BadRequestException('You are not a member of this group');
+    }
+
+    // Fetch one extra to check if there are more results
+    const take = limit + 1;
+    
+    let cursorCondition: any = {};
+    
+    // Parse cursor if provided (format: "timestamp_id")
+    if (cursor) {
+      const [timestamp, id] = cursor.split('_');
+      if (!timestamp || !id) {
+        throw new BadRequestException('Invalid cursor format. Expected: "timestamp_id"');
+      }
+      
+      const cursorDate = new Date(timestamp);
+      if (isNaN(cursorDate.getTime())) {
+        throw new BadRequestException('Invalid cursor timestamp');
+      }
+      
+      // For descending order (newest first), get messages older than cursor
+      // For ascending order (oldest first), get messages newer than cursor
+      if (sort === 'desc') {
+        cursorCondition = {
+          OR: [
+            { createdAt: { lt: cursorDate } },
+            { 
+              createdAt: cursorDate,
+              id: { lt: id }
+            }
+          ]
+        };
+      } else {
+        cursorCondition = {
+          OR: [
+            { createdAt: { gt: cursorDate } },
+            { 
+              createdAt: cursorDate,
+              id: { gt: id }
+            }
+          ]
+        };
+      }
+    }
+
+    // Build where clause: filter by groupId
+    const whereClause: any = {
+      groupId,
+    };
+
+    // Add cursor condition if present
+    if (Object.keys(cursorCondition).length > 0) {
+      whereClause.AND = cursorCondition;
+    }
+
+    // Fetch messages with cursor condition and group filter
+    const messages = await this.prisma.message.findMany({
+      where: whereClause,
+      take,
+      orderBy: [
+        { createdAt: sort },
+        { id: sort } // Secondary sort by ID for tie-breaking
+      ],
+    });
+
+    // Check if there are more results
+    const hasMore = messages.length > limit;
+    
+    // Remove the extra item if it exists
+    const dataItems = hasMore ? messages.slice(0, limit) : messages;
+    
+    // Generate cursors for next/prev pages
+    let nextCursor: string | null = null;
+    let prevCursor: string | null = null;
+    
+    if (hasMore && dataItems.length > 0) {
+      const lastItem = dataItems[dataItems.length - 1];
+      nextCursor = `${lastItem.createdAt.toISOString()}_${lastItem.id}`;
+    }
+    
+    if (dataItems.length > 0) {
+      const firstItem = dataItems[0];
+      prevCursor = `${firstItem.createdAt.toISOString()}_${firstItem.id}`;
+    }
+
+    const meta: CursorPaginationMeta = {
+      count: dataItems.length,
+      limit,
+      nextCursor,
+      prevCursor,
+      hasMore,
+    };
+
+    return {
+      data: dataItems.map((message) => new MessageEntity(message)),
+      meta,
+    };
+  }
+
+  /**
    * Validate that a user exists in the database and return user data.
    * @param userId - User UUID
    * @param userType - Description for error message (e.g., "Sender", "Receiver")

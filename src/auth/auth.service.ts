@@ -145,8 +145,9 @@ export class AuthService {
 
   /**
    * Generate new access token using valid refresh token.
+   * Implements refresh token rotation for enhanced security.
    * @param refreshToken - Refresh token from previous authentication
-   * @returns New access token
+   * @returns New access token and new refresh token
    * @throws UnauthorizedException if refresh token invalid or expired
    */
   async refreshAccessToken(refreshToken: string) {
@@ -181,11 +182,20 @@ export class AuthService {
         throw new UnauthorizedException('Invalid refresh token');
       }
 
-      // Generate new access token
+      // Generate new tokens (refresh token rotation)
       const newAccessToken = this.generateAccessToken(user.id, user.email);
+      const newRefreshToken = this.generateRefreshToken(user.id);
+      const hashedRefreshToken = await bcrypt.hash(newRefreshToken, 10);
+
+      // Update refresh token in database
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { refreshToken: hashedRefreshToken },
+      });
 
       return {
         access_token: newAccessToken,
+        refresh_token: newRefreshToken,
       };
     } catch (error) {
       throw new UnauthorizedException('Invalid or expired refresh token');
